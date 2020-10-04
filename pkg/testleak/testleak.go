@@ -44,11 +44,15 @@ func CheckMain(m *testing.M, maxWait time.Duration, ignores ...gotrace.Ignore) {
 // write a correct ignore function to detect which goroutine is spawned by current test.
 // But you can still use CheckMain to check leak, because it runs after all tests are settled.
 func Check(t *testing.T, maxWait time.Duration, ignores ...gotrace.Ignore) {
+	t.Helper()
+
 	if len(ignores) == 0 {
 		ignores = []gotrace.Ignore{gotrace.IgnoreCurrent()}
 	}
 
 	t.Cleanup(func() {
+		t.Helper()
+
 		ctx, cancel := context.WithTimeout(context.Background(), defaultMaxWait(maxWait))
 		defer cancel()
 
