@@ -53,6 +53,10 @@ func Check(t *testing.T, maxWait time.Duration, ignores ...gotrace.Ignore) {
 	t.Cleanup(func() {
 		t.Helper()
 
+		if t.Failed() {
+			return
+		}
+
 		ctx, cancel := context.WithTimeout(context.Background(), defaultMaxWait(maxWait))
 		defer cancel()
 
