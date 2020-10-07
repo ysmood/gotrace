@@ -32,7 +32,7 @@ func CheckMain(m *testing.M, maxWait time.Duration, ignores ...gotrace.Ignore) {
 	defer cancel()
 
 	if traces := gotrace.Wait(ctx, ignores...); traces.Any() {
-		log.Fatal(leakErrMsg, " ", traces.Format())
+		log.Fatalln(leakErrMsg, traces)
 	}
 }
 
@@ -61,7 +61,7 @@ func Check(t *testing.T, maxWait time.Duration, ignores ...gotrace.Ignore) {
 		defer cancel()
 
 		if traces := gotrace.Wait(ctx, ignores...); traces.Any() {
-			t.Error(leakErrMsg, traces.Format())
+			t.Error(leakErrMsg, traces)
 		}
 	})
 }

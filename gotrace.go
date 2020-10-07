@@ -21,6 +21,11 @@ type Trace struct {
 	Stacks      []Stack
 }
 
+// String interface for fmt
+func (t Trace) String() string {
+	return t.Raw
+}
+
 // Traces of goroutines
 type Traces []Trace
 
@@ -29,8 +34,8 @@ func (list Traces) Any() bool {
 	return len(list) > 0
 }
 
-// Format list into a human readable string
-func (list Traces) Format() string {
+// String interface for fmt
+func (list Traces) String() string {
 	out := ""
 	for _, t := range list {
 		out += t.Raw + "\n\n"

@@ -86,14 +86,14 @@ func ExampleCombineIgnores() {
 	// Output: only waits for the second goroutine
 }
 
-func ExampleTraces_Format() {
+func ExampleTraces_String() {
 	go func() {
 		time.Sleep(time.Second)
 	}()
 
-	str := gotrace.Wait(gotrace.Timeout(0)).Format()
+	str := fmt.Sprintf("%v", gotrace.Wait(gotrace.Timeout(0)))
 
-	fmt.Println(strings.Contains(str, "gotrace_test.ExampleTraces_Format"))
+	fmt.Println(strings.Contains(str, "gotrace_test.ExampleTraces_String"))
 
 	// Output: true
 }
