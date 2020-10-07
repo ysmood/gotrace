@@ -3,6 +3,7 @@ package gotrace_test
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -91,9 +92,27 @@ func ExampleTraces_String() {
 		time.Sleep(time.Second)
 	}()
 
-	str := fmt.Sprintf("%v", gotrace.Wait(gotrace.Timeout(0)))
+	traces := gotrace.Wait(gotrace.Timeout(0))
+
+	str := fmt.Sprintf("%v %v", traces[0], traces)
 
 	fmt.Println(strings.Contains(str, "gotrace_test.ExampleTraces_String"))
+
+	// Output: true
+}
+
+func ExampleSignal() {
+	go func() {
+		traces := gotrace.Wait(gotrace.Signal())
+		fmt.Println(strings.Contains(traces.String(), "gotrace_test.ExampleSignal"))
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+
+	p, _ := os.FindProcess(os.Getpid())
+	_ = p.Signal(os.Interrupt)
+
+	time.Sleep(100 * time.Millisecond)
 
 	// Output: true
 }

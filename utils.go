@@ -2,6 +2,8 @@ package gotrace
 
 import (
 	"context"
+	"os"
+	"os/signal"
 	"time"
 )
 
@@ -92,5 +94,24 @@ var nullCancel func()
 func Timeout(d time.Duration) context.Context {
 	ctx, c := context.WithTimeout(context.Background(), d)
 	nullCancel = c
+	return ctx
+}
+
+// Signal to cancel the returned context, default signal is CTRL+C .
+func Signal(signals ...os.Signal) context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	c := make(chan os.Signal)
+	if len(signals) == 0 {
+		signals = append(signals, os.Interrupt)
+	}
+
+	signal.Notify(c, signals...)
+	go func() {
+		<-c
+		signal.Stop(c)
+		cancel()
+	}()
+
 	return ctx
 }
