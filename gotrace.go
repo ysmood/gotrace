@@ -1,6 +1,7 @@
 package gotrace
 
 import (
+	"crypto/md5"
 	"regexp"
 	"runtime"
 	"strconv"
@@ -19,6 +20,8 @@ type Trace struct {
 	GoroutineID int64
 	WaitReason  string // https://github.com/golang/go/blob/874b3132a84cf76da6a48978826c04c380a37a50/src/runtime/runtime2.go#L997
 	Stacks      []Stack
+
+	typeKey string // hash sum of WaitReason and Stacks
 }
 
 // String interface for fmt
@@ -26,40 +29,25 @@ func (t Trace) String() string {
 	return t.Raw
 }
 
-// Traces of goroutines
-type Traces []Trace
-
-// Any item exists in the list
-func (list Traces) Any() bool {
-	return len(list) > 0
-}
-
-// String interface for fmt
-func (list Traces) String() string {
-	out := ""
-	for _, t := range list {
-		out += t.Raw + "\n\n"
-	}
-	return out
-}
-
 var regGoroutine = regexp.MustCompile(`^goroutine (\d+) \[(.+)\]:`)
 var regFunc = regexp.MustCompile(`^(.+?)(\([\w, ]+\))?$`)
-var regLoc = regexp.MustCompile(`^\t(.+)( \+0x\w+)?$`)
+var regLoc = regexp.MustCompile(`^\t(.+?)( \+0x\w+)?$`)
 
 // Get the Trace of the calling goroutine.
 // If all is true, all other goroutines' Traces will be appended into the result too.
 func Get(all bool) Traces {
 	rawList := strings.Split(getStack(all), "\n\n")
-	list := []Trace{}
+	list := []*Trace{}
 
 	for _, raw := range rawList {
 		lines := strings.Split(raw, "\n")
 
-		t := Trace{
+		t := &Trace{
 			Raw:    raw,
 			Stacks: []Stack{},
 		}
+
+		typeKey := md5.New()
 
 		for j, line := range lines {
 			if j == 0 {
@@ -67,15 +55,23 @@ func Get(all bool) Traces {
 				id, _ := strconv.ParseInt(ms[1], 10, 64)
 				t.GoroutineID = id
 				t.WaitReason = ms[2]
+
+				_, _ = typeKey.Write([]byte(t.WaitReason))
 			}
 
 			if j%2 == 1 {
-				t.Stacks = append(t.Stacks, Stack{
+				s := Stack{
 					regFunc.FindStringSubmatch(line)[1],
 					regLoc.FindStringSubmatch(lines[j+1])[1],
-				})
+				}
+				t.Stacks = append(t.Stacks, s)
+
+				_, _ = typeKey.Write([]byte(s.Func))
+				_, _ = typeKey.Write([]byte(s.Loc))
 			}
 		}
+
+		t.typeKey = string(typeKey.Sum(nil))
 
 		list = append(list, t)
 	}

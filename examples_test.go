@@ -63,7 +63,7 @@ func ExampleIgnoreFuncs() {
 func ExampleCombineIgnores() {
 	ignore := gotrace.CombineIgnores(
 		gotrace.IgnoreCurrent(),
-		func(t gotrace.Trace) bool {
+		func(t *gotrace.Trace) bool {
 			return strings.Contains(t.Raw, "ExampleCombineIgnores.func2")
 		},
 	)

@@ -2,13 +2,14 @@ package gotrace
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"time"
 )
 
 // Ignore filter
-type Ignore func(Trace) bool
+type Ignore func(*Trace) bool
 
 // IgnoreCurrent Trace list
 func IgnoreCurrent() Ignore {
@@ -17,7 +18,7 @@ func IgnoreCurrent() Ignore {
 
 // IgnoreList of Trace
 func IgnoreList(list Traces) Ignore {
-	return func(t Trace) bool {
+	return func(t *Trace) bool {
 		for _, item := range list {
 			if t.GoroutineID == item.GoroutineID {
 				return true
@@ -29,7 +30,7 @@ func IgnoreList(list Traces) Ignore {
 
 // IgnoreFuncs ignores a Trace if it's first Stack's Func equals one of the names.
 func IgnoreFuncs(names ...string) Ignore {
-	return func(t Trace) bool {
+	return func(t *Trace) bool {
 		for _, name := range names {
 			if t.Stacks[0].Func == name {
 				return true
@@ -41,7 +42,7 @@ func IgnoreFuncs(names ...string) Ignore {
 
 // CombineIgnores into one
 func CombineIgnores(list ...Ignore) Ignore {
-	return func(t Trace) bool {
+	return func(t *Trace) bool {
 		for _, i := range list {
 			if i(t) {
 				return true
@@ -59,7 +60,7 @@ func Wait(ctx context.Context, ignores ...Ignore) (remain Traces) {
 	ignore := CombineIgnores(ignores...)
 
 	for {
-		remain = []Trace{}
+		remain = []*Trace{}
 		list := Get(true)[1:]
 		for _, s := range list {
 			if ignore(s) {
@@ -88,11 +89,12 @@ func Wait(ctx context.Context, ignores ...Ignore) (remain Traces) {
 	}
 }
 
-var nullCancel func()
+var nullCancel = func() {}
 
 // Timeout shortcut for context.WithTimeout(context.Background(), d)
 func Timeout(d time.Duration) context.Context {
 	ctx, c := context.WithTimeout(context.Background(), d)
+	nullCancel()
 	nullCancel = c
 	return ctx
 }
@@ -114,4 +116,40 @@ func Signal(signals ...os.Signal) context.Context {
 	}()
 
 	return ctx
+}
+
+// Traces of goroutines
+type Traces []*Trace
+
+// Any item exists in the list
+func (list Traces) Any() bool {
+	return len(list) > 0
+}
+
+// String interface for fmt. It will merge similar trace together and print counts.
+func (list Traces) String() string {
+	type group struct {
+		count int
+		trace *Trace
+	}
+
+	// group by stack
+	groups := map[string]*group{}
+	for _, t := range list {
+		if g, has := groups[t.typeKey]; has {
+			g.count++
+		} else {
+			groups[t.typeKey] = &group{count: 1, trace: t}
+		}
+	}
+
+	out := ""
+	for _, g := range groups {
+		if g.count > 1 {
+			out += fmt.Sprintf("[%d] ", g.count) + g.trace.Raw + "\n\n"
+		} else {
+			out += g.trace.Raw + "\n\n"
+		}
+	}
+	return out
 }
