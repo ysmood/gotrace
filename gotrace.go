@@ -30,13 +30,13 @@ func (t Trace) String() string {
 }
 
 var regGoroutine = regexp.MustCompile(`^goroutine (\d+) \[(.+)\]:`)
-var regFunc = regexp.MustCompile(`^(.+?)(\([\w, ]+\))?$`)
-var regLoc = regexp.MustCompile(`^\s+([^\s].*)( \+0x\w+)?$`)
+var regFunc = regexp.MustCompile(`^(created by )?(.+?)(\([\w, ]+\))?$`)
+var regLoc = regexp.MustCompile(`^\t(.*)( \+0x\w+)?$`)
 
 // Get the Trace of the calling goroutine.
 // If all is true, all other goroutines' Traces will be appended into the result too.
 func Get(all bool) Traces {
-	rawList := strings.Split(getStack(all), "\n\n")
+	rawList := strings.Split(GetStack(all), "\n\n")
 	list := []*Trace{}
 
 	for _, raw := range rawList {
@@ -48,6 +48,11 @@ func Get(all bool) Traces {
 		}
 
 		typeKey := md5.New()
+
+		l := len(lines) - 3
+		if l > -1 && lines[l] == "...additional frames elided..." {
+			lines = append(lines[:l], lines[l+1:]...)
+		}
 
 		for j, line := range lines {
 			if j == 0 {
@@ -61,7 +66,7 @@ func Get(all bool) Traces {
 
 			if j%2 == 1 {
 				s := Stack{
-					regFunc.FindStringSubmatch(line)[1],
+					regFunc.FindStringSubmatch(line)[2],
 					regLoc.FindStringSubmatch(lines[j+1])[1],
 				}
 				t.Stacks = append(t.Stacks, s)
@@ -79,7 +84,8 @@ func Get(all bool) Traces {
 	return list
 }
 
-func getStack(all bool) string {
+// GetStack of current runtime
+var GetStack = func(all bool) string {
 	for i := 1024 * 1024; ; i *= 2 {
 		buf := make([]byte, i)
 		if n := runtime.Stack(buf, all); n < i {
