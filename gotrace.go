@@ -31,7 +31,7 @@ func (t Trace) String() string {
 
 var regGoroutine = regexp.MustCompile(`^goroutine (\d+) \[(.+)\]:`)
 var regFunc = regexp.MustCompile(`^(.+?)(\([\w, ]+\))?$`)
-var regLoc = regexp.MustCompile(`^\t(.+?)( \+0x\w+)?$`)
+var regLoc = regexp.MustCompile(`^\s+([^\s].*)( \+0x\w+)?$`)
 
 // Get the Trace of the calling goroutine.
 // If all is true, all other goroutines' Traces will be appended into the result too.

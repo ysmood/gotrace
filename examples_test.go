@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -43,6 +44,7 @@ func ExampleIgnoreCurrent() {
 }
 
 func ExampleIgnoreFuncs() {
+	ignoreCurrent := gotrace.IgnoreCurrent()
 	ignore := gotrace.IgnoreFuncs("internal/poll.runtime_pollWait")
 
 	go func() {
@@ -50,7 +52,7 @@ func ExampleIgnoreFuncs() {
 	}()
 
 	start := time.Now()
-	gotrace.Wait(context.TODO(), ignore)
+	gotrace.Wait(context.TODO(), ignore, ignoreCurrent)
 	end := time.Since(start)
 
 	if end > time.Second {
@@ -102,6 +104,12 @@ func ExampleTraces_String() {
 }
 
 func ExampleSignal() {
+	// Skip the test for Windows because it can't send signal programatically.
+	if runtime.GOOS == "windows" {
+		fmt.Println("true")
+		return
+	}
+
 	go func() {
 		traces := gotrace.Wait(gotrace.Signal())
 		fmt.Println(strings.Contains(traces.String(), "gotrace_test.ExampleSignal"))
