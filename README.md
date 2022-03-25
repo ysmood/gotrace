@@ -4,4 +4,4 @@ This lib provides useful functions to handle runtime goroutine stack. Such as wa
 
 Check the godoc for usage.
 
-Here is the example to use it with standard Go testing: [link](gotrace_test.go).
+Here is the example to use it with standard Go testing: [link](test_leak_test.go).
