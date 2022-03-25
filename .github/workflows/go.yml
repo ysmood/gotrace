@@ -10,16 +10,13 @@ jobs:
 
     - uses: actions/setup-go@v2
       with:
-        go-version: 1.16
+        go-version: 1.17
 
     - uses: actions/checkout@v2
 
     - run: |
-        go get github.com/ysmood/golangci-lint
-        golangci-lint
-        go test -coverprofile=coverage.txt
-        go get github.com/ysmood/got/cmd/check-cov
-        check-cov
+        go run github.com/ysmood/golangci-lint@latest
+        go test
 
   windows:
     strategy:
@@ -32,7 +29,7 @@ jobs:
 
     - uses: actions/setup-go@v2
       with:
-        go-version: 1.16
+        go-version: 1.17
 
     - uses: actions/checkout@v2
 
