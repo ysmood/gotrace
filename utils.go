@@ -103,7 +103,7 @@ func Timeout(d time.Duration) context.Context {
 func Signal(signals ...os.Signal) context.Context {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	c := make(chan os.Signal)
+	c := make(chan os.Signal, 1)
 	if len(signals) == 0 {
 		signals = append(signals, os.Interrupt)
 	}

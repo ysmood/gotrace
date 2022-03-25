@@ -1,13 +1,10 @@
-package testleak
+package gotrace
 
 import (
 	"context"
 	"log"
 	"os"
-	"testing"
 	"time"
-
-	"github.com/ysmood/gotrace"
 )
 
 const leakErrMsg = "leaking goroutines:"
@@ -19,10 +16,23 @@ func defaultMaxWait(t time.Duration) time.Duration {
 	return t
 }
 
+// M interface for testing.M
+type M interface {
+	Run() int
+}
+
+// T interface for testing.T
+type T interface {
+	Helper()
+	Failed() bool
+	Cleanup(f func())
+	Error(args ...interface{})
+}
+
 // CheckMain reports error if goroutines are leaking after all tests are done. Default timeout is 3s.
 // It's powerful but less accurate than Check, if you only use CheckMain it will be hard to tell which test
 // is the cause of the leak.
-func CheckMain(m *testing.M, maxWait time.Duration, ignores ...gotrace.Ignore) {
+func CheckMain(m M, maxWait time.Duration, ignores ...Ignore) {
 	code := m.Run()
 	if code != 0 {
 		os.Exit(code)
@@ -31,7 +41,7 @@ func CheckMain(m *testing.M, maxWait time.Duration, ignores ...gotrace.Ignore) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultMaxWait(maxWait))
 	defer cancel()
 
-	if traces := gotrace.Wait(ctx, ignores...); traces.Any() {
+	if traces := Wait(ctx, ignores...); traces.Any() {
 		log.Fatalln(leakErrMsg, traces)
 	}
 }
@@ -43,11 +53,11 @@ func CheckMain(m *testing.M, maxWait time.Duration, ignores ...gotrace.Ignore) {
 // because the test framework will execute tests at the same time which makes it impossible to
 // write a correct ignore function to detect which goroutine is spawned by current test.
 // But you can still use CheckMain to check leak, because it runs after all tests are settled.
-func Check(t *testing.T, maxWait time.Duration, ignores ...gotrace.Ignore) {
+func Check(t T, maxWait time.Duration, ignores ...Ignore) {
 	t.Helper()
 
 	if len(ignores) == 0 {
-		ignores = []gotrace.Ignore{gotrace.IgnoreCurrent()}
+		ignores = []Ignore{IgnoreCurrent()}
 	}
 
 	t.Cleanup(func() {
@@ -60,7 +70,7 @@ func Check(t *testing.T, maxWait time.Duration, ignores ...gotrace.Ignore) {
 		ctx, cancel := context.WithTimeout(context.Background(), defaultMaxWait(maxWait))
 		defer cancel()
 
-		if traces := gotrace.Wait(ctx, ignores...); traces.Any() {
+		if traces := Wait(ctx, ignores...); traces.Any() {
 			t.Error(leakErrMsg, traces)
 		}
 	})
