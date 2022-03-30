@@ -13,5 +13,5 @@ func TestMain(m *testing.M) {
 }
 
 func TestCase(t *testing.T) {
-	gotrace.Check(t, 0) // just add one line before each test
+	gotrace.CheckTest(t, 0) // just add one line before each test
 }
