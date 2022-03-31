@@ -5,18 +5,45 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"regexp"
+	"runtime"
 	"time"
 )
 
-// Ignore filter
-type Ignore func(*Trace) bool
+// GetStack of current runtime
+var GetStack = func(all bool) string {
+	for i := 1024 * 1024; ; i *= 2 {
+		buf := make([]byte, i)
+		if n := runtime.Stack(buf, all); n < i {
+			return string(buf[:n-1])
+		}
+	}
+}
 
-// IgnoreCurrent Trace list
+// Ignore returns true to ignore t
+type Ignore func(t *Trace) bool
+
+// IgnoreCurrent running goroutines
 func IgnoreCurrent() Ignore {
 	return IgnoreList(Get(true))
 }
 
-// IgnoreList of Trace
+// TraceAncestorsEnabled returns true if GODEBUG="tracebackancestors=N" is set
+var TraceAncestorsEnabled = regexp.MustCompile(`tracebackancestors=\d+`).MatchString(os.Getenv("GODEBUG"))
+
+// IgnoreNonChildren goroutines
+func IgnoreNonChildren() Ignore {
+	if !TraceAncestorsEnabled {
+		panic(`You must set GODEBUG="tracebackancestors=N", N should be a big enough integer, such as 1000`)
+	}
+
+	id := Get(false)[0].GoroutineID
+	return func(t *Trace) bool {
+		return !t.HasParent(id)
+	}
+}
+
+// IgnoreList of traces
 func IgnoreList(list Traces) Ignore {
 	return func(t *Trace) bool {
 		for _, item := range list {
@@ -52,33 +79,41 @@ func CombineIgnores(list ...Ignore) Ignore {
 	}
 }
 
-// Wait for other goroutines that are not ignored to exit. It returns the ones that are still active.
-// It keeps counting the active goroutines that are not ignored, if the number is zero return.
-func Wait(ctx context.Context, ignores ...Ignore) (remain Traces) {
-	sleep := time.Microsecond
+// Backoff is the default algorithm for sleep backoff
+var Backoff = func(t time.Duration) time.Duration {
 	const maxSleep = 300 * time.Millisecond
+	if t == 0 {
+		return time.Microsecond
+	}
+
+	t *= 2
+
+	if t > maxSleep {
+		return maxSleep
+	}
+
+	return t
+}
+
+// Wait uses Backoff for WaitWithBackoff
+func Wait(ctx context.Context, ignores ...Ignore) (remain Traces) {
+	return WaitWithBackoff(ctx, Backoff, ignores...)
+}
+
+// WaitWithBackoff algorithm. Wait for other goroutines that are not ignored to exit. It returns the ones that are still active.
+// It keeps counting the active goroutines that are not ignored, if the number is zero return.
+func WaitWithBackoff(ctx context.Context, backoff func(time.Duration) time.Duration, ignores ...Ignore) (remain Traces) {
+	sleep := backoff(0)
 	ignore := CombineIgnores(ignores...)
 
 	for {
-		remain = []*Trace{}
-		list := Get(true)[1:]
-		for _, s := range list {
-			if ignore(s) {
-				continue
-			}
-			remain = append(remain, s)
-		}
+		remain = Get(true)[1:].Filter(ignore)
 
 		if len(remain) == 0 {
 			return
 		}
 
-		// backoff
-		sleep *= 2
-		if sleep > maxSleep {
-			sleep = maxSleep
-		}
-
+		sleep = backoff(sleep)
 		tmr := time.NewTimer(sleep)
 		select {
 		case <-ctx.Done():
@@ -124,6 +159,18 @@ type Traces []*Trace
 // Any item exists in the list
 func (list Traces) Any() bool {
 	return len(list) > 0
+}
+
+// Filter returns the remain Traces that are ignored
+func (list Traces) Filter(ignore Ignore) Traces {
+	remain := Traces{}
+	for _, s := range list {
+		if ignore(s) {
+			continue
+		}
+		remain = append(remain, s)
+	}
+	return remain
 }
 
 // String interface for fmt. It will merge similar trace together and print counts.

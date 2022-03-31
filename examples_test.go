@@ -6,23 +6,34 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/ysmood/gotrace"
 )
 
+func TestExample(t *testing.T) {
+	// Supports parallel leak detection
+	t.Parallel()
+
+	// Make sure no leak after the test
+	gotrace.CheckLeak(t, 0)
+
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+	}()
+}
+
 func ExampleGet() {
 	list := gotrace.Get(true)
 
-	fmt.Println("goroutine count:", len(list))
 	fmt.Println("id of current:", list[0].GoroutineID)
 	fmt.Println("caller of current:", list[0].Stacks[2].Func)
 
 	// Output:
 	//
-	// goroutine count: 2
 	// id of current: 1
-	// caller of current: github.com/ysmood/gotrace_test.ExampleGet()
+	// caller of current: github.com/ysmood/gotrace_test.ExampleGet
 }
 
 func ExampleIgnoreCurrent() {

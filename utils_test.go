@@ -60,3 +60,20 @@ created by main.testFn.func2
 		t.Fail()
 	}
 }
+
+func TestIgnoreNonChildrenPanic(t *testing.T) {
+	old := gotrace.TraceAncestorsEnabled
+	gotrace.TraceAncestorsEnabled = false
+	t.Cleanup(func() {
+		gotrace.TraceAncestorsEnabled = old
+	})
+
+	defer func() {
+		r := recover()
+		if r.(string) != `You must set GODEBUG="tracebackancestors=N", N should be a big enough integer, such as 1000` {
+			t.Fail()
+		}
+	}()
+
+	gotrace.IgnoreNonChildren()
+}

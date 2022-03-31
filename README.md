@@ -1,7 +1,15 @@
 # Overview
 
-This lib provides useful functions to handle runtime goroutine stack. Such as wait for goroutines to exit.
+A lib for monitoring runtime goroutine stack.
+Such as wait for goroutines to exit, leak detection, etc.
 
-Check the godoc for usage.
+## Features
 
-Here is the example to use it with standard Go testing: [link](test_leak_test.go).
+- `context.Context` first design
+- `testing.Parallel` support
+- No dependencies and 100% test coverage
+- Provides handy low-level APIs to extend the lib
+
+## Guides
+
+To get started check the [examples](examples_test.go).

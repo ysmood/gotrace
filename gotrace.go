@@ -2,8 +2,8 @@ package gotrace
 
 import (
 	"crypto/md5"
+	"fmt"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 )
@@ -16,10 +16,11 @@ type Stack struct {
 
 // Trace of one goroutine
 type Trace struct {
-	Raw         string
-	GoroutineID int64
-	WaitReason  string // https://github.com/golang/go/blob/874b3132a84cf76da6a48978826c04c380a37a50/src/runtime/runtime2.go#L997
-	Stacks      []Stack
+	Raw                  string
+	GoroutineID          int64
+	GoroutineAncestorIDs []int64 // Need GODEBUG="tracebackancestors=N" to be set
+	WaitReason           string  // https://github.com/golang/go/blob/874b3132a84cf76da6a48978826c04c380a37a50/src/runtime/runtime2.go#L997
+	Stacks               []Stack
 
 	typeKey string // hash sum of WaitReason and Stacks
 }
@@ -29,8 +30,19 @@ func (t Trace) String() string {
 	return t.Raw
 }
 
+// HasParent goroutine id
+func (t Trace) HasParent(id int64) bool {
+	for _, pid := range t.GoroutineAncestorIDs {
+		if pid == id {
+			return true
+		}
+	}
+	return false
+}
+
 var regGoroutine = regexp.MustCompile(`^goroutine (\d+) \[(.+)\]:`)
-var regFunc = regexp.MustCompile(`^(created by )?(.+?)(\([\w, ]+\))?$`)
+var regParent = regexp.MustCompile(`^\[originating from goroutine (\d+)\]:`)
+var regFunc = regexp.MustCompile(`^(?:created by )?([^()]+)`)
 var regLoc = regexp.MustCompile(`^\t(.*)( \+0x\w+)?$`)
 
 // Get the Trace of the calling goroutine.
@@ -43,8 +55,9 @@ func Get(all bool) Traces {
 		lines := strings.Split(raw, "\n")
 
 		t := &Trace{
-			Raw:    raw,
-			Stacks: []Stack{},
+			Raw:                  raw,
+			Stacks:               []Stack{},
+			GoroutineAncestorIDs: []int64{},
 		}
 
 		typeKey := md5.New()
@@ -54,42 +67,46 @@ func Get(all bool) Traces {
 			lines = append(lines[:l], lines[l+1:]...)
 		}
 
-		for j, line := range lines {
-			if j == 0 {
-				ms := regGoroutine.FindStringSubmatch(line)
+		ancestor := false
+
+		for i := 0; i < len(lines); i++ {
+			l := lines[i]
+
+			if i == 0 {
+				ms := regGoroutine.FindStringSubmatch(l)
 				id, _ := strconv.ParseInt(ms[1], 10, 64)
 				t.GoroutineID = id
 				t.WaitReason = ms[2]
 
 				_, _ = typeKey.Write([]byte(t.WaitReason))
+				continue
+			} else if i != 0 && l[len(l)-1] == ':' {
+				ancestor = true
+				ms := regParent.FindStringSubmatch(l)
+				id, _ := strconv.ParseInt(ms[1], 10, 64)
+				t.GoroutineAncestorIDs = append(t.GoroutineAncestorIDs, id)
 			}
 
-			if j%2 == 1 {
-				s := Stack{
-					regFunc.FindStringSubmatch(line)[2],
-					regLoc.FindStringSubmatch(lines[j+1])[1],
-				}
-				t.Stacks = append(t.Stacks, s)
-
-				_, _ = typeKey.Write([]byte(s.Func))
-				_, _ = typeKey.Write([]byte(s.Loc))
+			if ancestor {
+				continue
 			}
+
+			s := Stack{
+				regFunc.FindStringSubmatch(l)[1],
+				regLoc.FindStringSubmatch(lines[i+1])[1],
+			}
+			t.Stacks = append(t.Stacks, s)
+
+			_, _ = typeKey.Write([]byte(s.Func))
+			_, _ = typeKey.Write([]byte(s.Loc))
+
+			i++
 		}
 
-		t.typeKey = string(typeKey.Sum(nil))
+		t.typeKey = fmt.Sprintf("%x", typeKey.Sum(nil))
 
 		list = append(list, t)
 	}
 
 	return list
-}
-
-// GetStack of current runtime
-var GetStack = func(all bool) string {
-	for i := 1024 * 1024; ; i *= 2 {
-		buf := make([]byte, i)
-		if n := runtime.Stack(buf, all); n < i {
-			return string(buf[:n-1])
-		}
-	}
 }
