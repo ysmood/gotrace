@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,6 +14,9 @@ import (
 )
 
 func TestAncestors(t *testing.T) {
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
 	wait := make(chan int)
 
 	go func() {
@@ -26,7 +30,7 @@ func TestAncestors(t *testing.T) {
 			}()
 		}()
 
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 
 		id := gotrace.Get(false)[0].GoroutineID
 
@@ -34,6 +38,8 @@ func TestAncestors(t *testing.T) {
 		if len(ts) != 1 && ts[0].GoroutineID != id {
 			t.Fail()
 		}
+
+		wg.Done()
 	}()
 
 	for _, trace := range gotrace.Get(true) {
@@ -42,8 +48,7 @@ func TestAncestors(t *testing.T) {
 		}
 	}
 
-	time.Sleep(100 * time.Millisecond)
-
+	wg.Wait()
 	close(wait)
 }
 
