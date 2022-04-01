@@ -6,7 +6,7 @@ Such as wait for goroutines to exit, leak detection, etc.
 ## Features
 
 - `context.Context` first design
-- `testing.Parallel` support
+- Concurrent leak detection
 - No dependencies and 100% test coverage
 - Provides handy low-level APIs to extend the lib
 
